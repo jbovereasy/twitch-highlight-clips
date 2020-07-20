@@ -1,6 +1,8 @@
+from bs4 import BeautifulSoup as bs
 import requests
 import boto3
-import os, json
+import os, json, re
+
 
 session = boto3.Session(profile_name="default")
 client = boto3.client('s3')
@@ -16,7 +18,7 @@ CONFIG = {
     'scopes' : []
 }
 
-base_url = 'https://api.twitch.tv/helix'
+base_url = 'https://api.twitch.tv/helix/'
 user_list= 'aws'
 
 def get_twitch_token():
@@ -30,7 +32,7 @@ def validate_token():
 
 
 def get_user_id():
-    url = base_url + "/users?login=" + user_list
+    url = base_url + "users?login=" + user_list
     headers = {
         'Client-ID' : CONFIG['client_id'],
         'Authorization' : f"Bearer {CONFIG['access_token']}"
@@ -40,10 +42,32 @@ def get_user_id():
     
     return user_id
 
-def get_top_clips():
+def get_top_daily_clips():
     user_id = get_user_id()
-    print(user_id)
+    limit = 2
+    start_date = str("2020-07-11T00:00:01Z")
+    end_date = str("2020-07-11T23:59:59Z")
+    clips = []
+    url = f"{base_url}clips?broadcaster_id={user_id}&first={limit}&started_at={start_date}&ended_at={end_date}"
+    print()
+    headers = {
+        'Client-ID' : CONFIG['client_id'],
+        'Authorization' : f"Bearer {CONFIG['access_token']}"
+    }
+    r = requests.get(url, headers=headers).json()['data']
+    for i in r:
+        clips.append(i['url'])
+    
+    print(clips)
+    return clips
 
+def web_scrape_clips():
+    # clips = get_top_daily_clips()
+    url = 'https://clips.twitch.tv/KnottyBlightedKangarooNerfRedBlaster'
+    res = requests.get(url)
+    soup = bs(res.text)
+    print(soup.prettify())
+    
 
 def post_to_bucket():
     bucketname = listbucket['Buckets'][0]['Name']
@@ -59,6 +83,8 @@ def main():
     print(os.environ)
 
 if __name__ == '__main__':
+    
     if os.environ.get('ACCESS_TOKEN') is None:
         get_twitch_token()
-    get_top_clips()
+    web_scrape_clips()
+    # get_top_daily_clips()
